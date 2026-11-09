@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mi Negocio Açai</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#35263e;background:#faf7fc}*{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}button,input,select{font:inherit}button{cursor:pointer;border:0}.app{display:flex;min-height:100vh}.sidebar{width:245px;background:#54266f;color:white;padding:24px 16px;flex-shrink:0}.brand{font-size:22px;font-weight:800;padding:6px 12px 30px}.nav{display:block;width:100%;text-align:left;background:transparent;color:#f3e5f7;border-radius:12px;padding:13px 15px;margin-bottom:5px}.nav.active,.nav:hover{background:#75418e}.main{flex:1;padding:28px;min-width:0}.top{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;margin-bottom:24px}h1{font-size:27px;margin:0}h2{font-size:20px;margin:0 0 18px}.muted{color:#82758b;font-size:13px}.tag{background:#eee1f4;color:#63327a;padding:8px 12px;border-radius:20px;font-size:13px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:16px;margin-bottom:24px}.card,.panel{background:white;border:1px solid #eee6f2;border-radius:16px;padding:20px;box-shadow:0 4px 18px #50236608}.value{font-size:27px;font-weight:800;color:#62317d;margin:10px 0 2px}.panel{margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}.field input,.field select{padding:11px;border:1px solid #ded2e6;border-radius:9px;background:white;min-width:0}.primary{background:#693785;color:white;border-radius:10px;padding:12px 17px;margin-top:16px;font-weight:700}.primary:hover{background:#51236d}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:12px 9px;text-align:left;border-bottom:1px solid #eee7f1}th{color:#796884;font-size:12px}.scroll{overflow:auto}.note{background:#f4ebf8;padding:13px;border-radius:10px;font-size:13px;color:#674477;margin-bottom:20px}.danger{color:#a3334d}.smallbtn{background:#f1e7f5;border-radius:7px;padding:8px 11px;color:#663780}.loginwrap{min-height:100vh;display:grid;place-items:center;padding:20px;background:#faf7fc}.login{width:min(440px,100%);background:white;border:1px solid #eee6f2;border-radius:20px;padding:32px;box-shadow:0 12px 35px #50236616}.login h1{color:#54266f;margin-bottom:8px}.login .field{margin-top:17px}.login .primary{width:100%}.status{margin:12px 0;color:#a3334d;font-size:13px}.busy{opacity:.65;pointer-events:none}@media(max-width:750px){.app{display:block}.sidebar{width:100%;padding:12px}.brand{padding:8px}.menu{display:flex;overflow:auto;gap:5px}.nav{white-space:nowrap;width:auto;padding:10px}.main{padding:16px}h1{font-size:22px}}
+</style></head><body>
+<div id="login" class="loginwrap"><form class="login" id="loginForm"><h1>🫐 Mi Negocio Açai</h1><p class="muted">Ingresá con tu correo y contraseña.</p><label class="field">Correo electrónico<input type="email" id="email" autocomplete="username" required></label><label class="field">Contraseña<input type="password" id="password" autocomplete="current-password" required></label><p class="status" id="loginError" role="alert"></p><button class="primary" id="loginBtn">Ingresar</button></form></div>
+<div class="app" id="app" hidden><aside class="sidebar"><div class="brand">🫐 Mi Negocio Açai</div><nav class="menu" id="menu"></nav><button class="nav" id="logout">↪ Cerrar sesión</button></aside><main class="main"><div class="top"><div><h1 id="title">Inicio</h1><div class="muted">Organizá tu emprendimiento en un solo lugar 💜</div></div><span class="tag" id="roleTag">Conectado a Supabase</span></div><div class="note" id="notice">Cargando datos…</div><div id="content"></div></main></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://rbnkejmcaczjzablbyen.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__4DjCtQC_CbUsxWxEhDiVA_yuTg5vS_';
+const sb = window.supabase?.createClient(SUPABASE_URL,SUPABASE_KEY);
+const fallbackProducts=[{id:1,nombre:'Açai tradicional 300 ml',precio:15000},{id:2,nombre:'Açai tradicional 400 ml',precio:20000},{id:3,nombre:'Helado frutal',precio:2500},{id:4,nombre:'Geladinho',precio:1000}];
+let products=[],sales=[],expenses=[],moves=[],page='Inicio',role='',user=null;
+const sections=['Inicio','Ventas','Gastos','Inventario','Reportes'];
+const $=id=>document.getElementById(id);
+const money=n=>'G. '+Number(n||0).toLocaleString('es-PY');
+const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;',"'":'&#39;'}[c]));
+const sum=(a,f)=>a.reduce((n,x)=>n+f(x),0);
+const card=(label,value)=>`<div class="card"><div class="muted">${label}</div><div class="value">${value}</div></div>`;
+const panel=(title,body)=>`<section class="panel"><h2>${title}</h2>${body}</section>`;
+function table(headers,rows){return `<div class="scroll"><table><thead><tr>${headers.map(x=>`<th>${safe(x)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map(c=>`<td>${safe(c)}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${headers.length}" class="muted">Todavía no hay registros</td></tr>`}</tbody></table></div>`}
+function dateOf(x){const v=x.fecha||x.creado_en||x.created_at||x.fecha_venta;return v?new Date(v).toLocaleDateString('es-PY'):'—'}
+function saleAmount(x){return Number(x.total??x.monto_total??(Number(x.cantidad||x.qty||0)*Number(x.precio_unitario||x.precio||0)))}
+function salePayment(x){return x.forma_pago||x.metodo_pago||x.pago||x.estado_pago||'—'}
+function saleProduct(x){return products.find(p=>String(p.id)===String(x.producto_id))?.nombre||x.producto||'—'}
+function stockFor(id){return sum(moves.filter(x=>String(x.producto_id)===String(id)),x=>Number(x.cantidad||0)*(x.tipo==='Salida'?-1:1))}
+function fail(err){$('notice').textContent='No se pudo completar la operación: '+(err?.message||String(err));$('notice').classList.add('danger')}
+function clearError(){$('notice').classList.remove('danger');$('notice').textContent='Datos consultados en Supabase. Verificá el funcionamiento antes de usar el sistema con ventas reales.'}
+async function load(){
+  if(!sb)return fail('No se cargó la biblioteca de Supabase. Revisá la conexión a internet.');
+  const tables=['productos','ventas','gastos','movimientos_inventario'];
+  const results=await Promise.all(tables.map(t=>sb.from(t).select('*').limit(1000)));
+  const errors=results.map((r,i)=>r.error?`${tables[i]}: ${r.error.message}`:null).filter(Boolean);
+  products=results[0].data||fallbackProducts;sales=results[1].data||[];expenses=results[2].data||[];moves=results[3].data||[];
+  if(errors.length)fail(errors.join(' | '));else clearError();
+  render();
+}
+async function enter(session){
+ user=session?.user||null;
+ if(!user){$('login').hidden=false;$('app').hidden=true;return}
+ const {data,error}=await sb.from('perfiles').select('rol').eq('id',user.id).single();
+ if(error||!data?.rol){await sb.auth.signOut();$('loginError').textContent='Tu cuenta no tiene un perfil autorizado. Revisá Supabase.';return}
+ role=data.rol;
+ $('login').hidden=true;$('app').hidden=false;
+ $('roleTag').textContent=role==='administradora'?'Administradora':'Operador';
+ await load();go('Inicio');
+}
+$('loginForm').addEventListener('submit',async e=>{
+ e.preventDefault();$('loginError').textContent='';
+ if(!sb){$('loginError').textContent='No se pudo cargar Supabase.';return}
+ $('loginBtn').disabled=true;
+ const {data,error}=await sb.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+ $('loginBtn').disabled=false;
+ if(error){$('loginError').textContent='No se pudo iniciar sesión. Revisá el correo y la contraseña.';return}
+ $('password').value='';await enter(data.session);
+});
+$('logout').addEventListener('click',async()=>{await sb.auth.signOut();user=null;role='';sales=[];expenses=[];moves=[];$('app').hidden=true;$('login').hidden=false});
+function go(p){if(p==='Reportes'&&role!=='administradora')return;page=p;$('title').textContent=p;$('menu').innerHTML=sections.filter(s=>s!=='Reportes'||role==='administradora').map(s=>`<button class="nav ${s===p?'active':''}" data-page="${s}">${({Inicio:'⌂',Ventas:'🛍',Gastos:'↗',Inventario:'▣',Reportes:'▤'})[s]} ${s}</button>`).join('');$('menu').querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));render()}
+function render(){
+ const revenue=sum(sales,saleAmount),received=sum(sales.filter(x=>!['Pendiente','pendiente'].includes(salePayment(x))),saleAmount),pending=revenue-received,spent=sum(expenses,x=>Number(x.monto??x.amount??0));let html='';
+ if(page==='Inicio')html=`<div class="cards">${card('Ventas registradas',money(revenue))}${card('Cobrado',money(received))}${card('Pendiente de cobro',money(pending))}${card('Gastos',money(spent))}</div>`+panel('Últimas ventas',table(['Fecha','Producto','Cantidad','Total','Estado'],sales.slice(-6).reverse().map(x=>[dateOf(x),saleProduct(x),x.cantidad||x.qty||'—',money(saleAmount(x)),salePayment(x)])));
+ if(page==='Ventas')html=panel('Registrar venta',`<form id="saleForm"><div class="grid"><label class="field">Producto<select name="product" required>${products.map(p=>`<option value="${safe(p.id)}">${safe(p.nombre)} · ${money(p.precio)}</option>`).join('')}</select></label><label class="field">Cantidad<input name="qty" type="number" min="1" value="1" required></label><label class="field">Forma de pago<select name="payment"><option>Efectivo</option><option>Transferencia</option><option>Pendiente</option></select></label></div><button class="primary">Guardar venta</button></form>`)+panel('Historial de ventas',table(['Fecha','Producto','Cantidad','Total','Pago'],sales.slice().reverse().map(x=>[dateOf(x),saleProduct(x),x.cantidad||x.qty||'—',money(saleAmount(x)),salePayment(x)])));
+ if(page==='Gastos')html=panel('Registrar gasto',`<form id="expenseForm"><div class="grid"><label class="field">Concepto<input name="concept" required></label><label class="field">Monto (Gs.)<input name="amount" type="number" min="1" required></label></div><button class="primary">Guardar gasto</button></form>`)+panel('Gastos registrados',table(['Fecha','Concepto','Monto'],expenses.slice().reverse().map(x=>[dateOf(x),x.concepto||x.descripcion||'—',money(x.monto??x.amount)])));
+ if(page==='Inventario')html=panel('Agregar productos terminados',`<form id="stockForm"><div class="grid"><label class="field">Producto<select name="product">${products.map(p=>`<option value="${safe(p.id)}">${safe(p.nombre)}</option>`).join('')}</select></label><label class="field">Cantidad producida<input name="qty" type="number" min="1" required></label></div><button class="primary">Agregar al inventario</button></form>`)+panel('Existencias',table(['Producto','Unidades disponibles'],products.map(p=>[p.nombre,stockFor(p.id)])));
+ if(page==='Reportes'&&role==='administradora')html=`<div class="cards">${card('Total vendido',money(revenue))}${card('Total cobrado',money(received))}${card('Cuentas pendientes',money(pending))}${card('Gastos registrados',money(spent))}</div>`+panel('Resumen',`<p>Ingresos cobrados menos gastos: <strong>${money(received-spent)}</strong></p><p class="muted">No equivale a ganancia real: faltan costos de producción y otros ajustes.</p><button class="primary" id="export">Exportar ventas (CSV para Excel)</button>`);
+ $('content').innerHTML=html;
+ if($('saleForm'))$('saleForm').onsubmit=addSale;
+ if($('expenseForm'))$('expenseForm').onsubmit=addExpense;
+ if($('stockForm'))$('stockForm').onsubmit=addStock;
+ if($('export'))$('export').onclick=exportCSV;
+}
+async function addSale(e){
+ e.preventDefault();const f=new FormData(e.target),p=products.find(x=>String(x.id)===f.get('product')),qty=Number(f.get('qty'));if(!p||!Number.isInteger(qty)||qty<1)return;
+ if(stockFor(p.id)<qty)return alert('No hay suficiente inventario. Primero agregá producción.');
+ // IMPORTANTE: esta escritura depende de las columnas reales de la tabla y debe probarse antes de usarla.
+ const {error}=await sb.from('ventas').insert({producto_id:p.id,cantidad:qty,precio_unitario:p.precio,total:qty*p.precio,forma_pago:f.get('payment')});
+ if(error)return fail(error);
+ const {error:stockError}=await sb.from('movimientos_inventario').insert({producto_id:p.id,tipo:'Salida',cantidad:qty,observacion:'Venta'});
+ if(stockError){fail('La venta se guardó, pero NO se descontó el inventario. No repitas la venta. '+stockError.message);await load();return}
+ await load();alert('Venta registrada en Supabase.');
+}
+async function addExpense(e){e.preventDefault();const f=new FormData(e.target),amount=Number(f.get('amount'));if(!(amount>0))return;const {error}=await sb.from('gastos').insert({concepto:String(f.get('concept')).trim(),monto:amount});if(error)return fail(error);await load();alert('Gasto registrado.')}
+async function addStock(e){e.preventDefault();const f=new FormData(e.target),qty=Number(f.get('qty'));if(!Number.isInteger(qty)||qty<1)return;const {error}=await sb.from('movimientos_inventario').insert({producto_id:Number(f.get('product')),tipo:'Entrada',cantidad:qty,observacion:'Producción'});if(error)return fail(error);await load();alert('Inventario actualizado.')}
+function exportCSV(){const rows=[['Fecha','Producto','Cantidad','Total','Pago'],...sales.map(x=>[dateOf(x),saleProduct(x),x.cantidad||x.qty,saleAmount(x),salePayment(x)])];const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='ventas-acai.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+(async()=>{if(!sb){$('loginError').textContent='No se pudo cargar la biblioteca de Supabase.';return}const {data}=await sb.auth.getSession();if(data.session)await enter(data.session)})();
+</script></body></html>
